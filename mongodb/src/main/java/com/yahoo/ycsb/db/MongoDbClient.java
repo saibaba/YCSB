@@ -26,6 +26,9 @@ import com.mongodb.Mongo;
 import com.mongodb.MongoOptions;
 import com.mongodb.WriteConcern;
 import com.mongodb.WriteResult;
+import com.mongodb.MongoClient;
+import com.mongodb.MongoClientURI;
+import com.mongodb.MongoClientOptions;
 import com.yahoo.ycsb.ByteArrayByteIterator;
 import com.yahoo.ycsb.ByteIterator;
 import com.yahoo.ycsb.DB;
@@ -36,7 +39,7 @@ import com.yahoo.ycsb.DBException;
  * 
  * Properties to set:
  * 
- * mongodb.url=mongodb://localhost:27017 mongodb.database=ycsb
+ * mongodb.url=mongodb://[user:password@]localhost:27017 mongodb.database=ycsb
  * mongodb.writeConcern=normal
  * 
  * @author ypai
@@ -105,19 +108,17 @@ public class MongoDbClient extends DB {
             }
 
             try {
-                // strip out prefix since Java driver doesn't currently support
-                // standard connection format URL yet
-                // http://www.mongodb.org/display/DOCS/Connections
-                if (url.startsWith("mongodb://")) {
-                    url = url.substring(10);
-                }
 
-                // need to append db to url.
+                MongoClientOptions.Builder builder = new MongoClientOptions.Builder();
+                builder.connectionsPerHost(Integer.parseInt(maxConnections));
+
+                // need to append db to url for username/password@ to authenticate with given db
                 url += "/" + database;
                 System.out.println("new database url = " + url);
-                MongoOptions options = new MongoOptions();
-                options.connectionsPerHost = Integer.parseInt(maxConnections);
-                mongo = new Mongo(new DBAddress(url), options);
+
+                MongoClientURI mongoURI = new MongoClientURI(url, builder);
+                
+                mongo = new MongoClient(mongoURI);
 
                 System.out.println("mongo connection created with " + url);
             }
@@ -203,6 +204,9 @@ public class MongoDbClient extends DB {
                 r.put(k, values.get(k).toArray());
             }
             WriteResult res = collection.insert(r, writeConcern);
+            if (res.getError() != null ) {
+                System.out.println("getError: " + res.getError());
+            }
             return res.getError() == null ? 0 : 1;
         }
         catch (Exception e) {
